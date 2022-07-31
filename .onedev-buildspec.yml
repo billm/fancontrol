@@ -1,0 +1,24 @@
+version: 17
+jobs:
+- name: Sync to Github
+  steps:
+  - !PushRepository
+    name: Push to github
+    remoteUrl: https://github.com/billm/fancontrol.git
+    passwordSecret: github-access-token
+    withLfs: false
+    force: false
+    condition: ALL_PREVIOUS_STEPS_WERE_SUCCESSFUL
+  triggers:
+  - !BranchUpdateTrigger
+    branches: main
+    projects: fancontrol
+  - !TagCreateTrigger
+    branches: main
+    projects: fancontrol
+  retryCondition: never
+  maxRetries: 3
+  retryDelay: 30
+  cpuRequirement: 250
+  memoryRequirement: 256
+  timeout: 3600
