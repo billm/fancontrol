@@ -9,13 +9,6 @@ jobs:
     withLfs: false
     force: false
     condition: ALL_PREVIOUS_STEPS_WERE_SUCCESSFUL
-  triggers:
-  - !BranchUpdateTrigger
-    branches: main
-    projects: fancontrol
-  - !TagCreateTrigger
-    branches: main
-    projects: fancontrol
   retryCondition: never
   maxRetries: 3
   retryDelay: 30
@@ -28,12 +21,20 @@ jobs:
     name: Compile and Release
     templateName: Compile and Release
     condition: ALL_PREVIOUS_STEPS_WERE_SUCCESSFUL
+  triggers:
+  - !BranchUpdateTrigger
+    branches: main
+    projects: fancontrol
   retryCondition: never
   maxRetries: 3
   retryDelay: 30
   cpuRequirement: 250
   memoryRequirement: 256
   timeout: 3600
+  postBuildActions:
+  - !RunJobAction
+    condition: successful
+    jobName: Sync to Github
 stepTemplates:
 - name: Compile and Release
   steps:
