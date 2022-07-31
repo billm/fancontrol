@@ -22,3 +22,19 @@ jobs:
   cpuRequirement: 250
   memoryRequirement: 256
   timeout: 3600
+stepTemplates:
+- name: Compile and Release
+  steps:
+  - !CommandStep
+    name: Compile
+    runInContainer: true
+    image: golang
+    interpreter: !DefaultInterpreter
+      commands:
+      - go build fancontrol.go
+    useTTY: false
+    condition: ALL_PREVIOUS_STEPS_WERE_SUCCESSFUL
+  - !PublishArtifactStep
+    name: Release
+    artifacts: fancontrol
+    condition: ALL_PREVIOUS_STEPS_WERE_SUCCESSFUL
