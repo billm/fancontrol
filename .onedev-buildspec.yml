@@ -22,6 +22,18 @@ jobs:
   cpuRequirement: 250
   memoryRequirement: 256
   timeout: 3600
+- name: Compile and Release
+  steps:
+  - !UseTemplateStep
+    name: Compile and Release
+    templateName: Compile and Release
+    condition: ALL_PREVIOUS_STEPS_WERE_SUCCESSFUL
+  retryCondition: never
+  maxRetries: 3
+  retryDelay: 30
+  cpuRequirement: 250
+  memoryRequirement: 256
+  timeout: 3600
 stepTemplates:
 - name: Compile and Release
   steps:
