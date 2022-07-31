@@ -11,6 +11,27 @@ import (
 	"time"
 )
 
+/*
+ * Fan control software for the following board(s):
+ * Supermicro PIO-617R-TLN4F+-ST031/X9DRi-LN4+/X9DR3-LN4+
+ *
+ * This is intended to provide a better fan curve for home usage on
+ * this motherboards so you neighbors don't think you are working
+ * on jet engines.
+ *
+ * DISCLAIMER: The author of this code provides the code free of
+ * charge with no conditions on usage and provides no warrantee or
+ * guarantee of any kind. Compile and run this at your own risk
+ * if your computer blows up, you win the lotto, or world war 3
+ * coincidentally starts after running this code, that is on you.
+ *
+ * Some day I will put a real license here, until then whatever
+ * happens, it is not my fault.
+ *
+ */
+
+const ipmitool = "/usr/bin/ipmitool"
+
 var fanLowSpeed float64 = 80
 var fanLowTemp float64 = 30
 
@@ -100,44 +121,56 @@ func manageFans() {
 	} else if curTemp > fanHighTemp {
 		fanSpeed = fanHighSpeed
 	} else {
-		//var fanSpeedF float64 = fanLowSpeed + ((curTemp - fanLowTemp) / (fanHighTemp - fanLowTemp) * (fanHighSpeed - fanLowSpeed))
 		var fanSpeedF float64 = ((curTemp - fanLowTemp) / (fanHighTemp - fanLowTemp)) * (fanHighSpeed)
 		fanSpeed = fanSpeedF
 	}
+	// TODO - cache fan speeds, only send ipmitool command if this needs to change
 	fmt.Printf("Setting fan speed to %d%%\n", int((fanSpeed/fanHighSpeed)*100))
 
-	ipmiArgs := strings.Split(fmt.Sprintf("/usr/bin/ipmitool raw 0x30 0x91 0x5A 0x3 0x10 0x%x", int(fanSpeed)), " ")
-	ipmitool := exec.Command("./ipmitool.sh")
-	ipmitool.Args = ipmiArgs
-	//_, err := ipmitool.Output()
+	// https://forums.servethehome.com/index.php?threads/supermicro-ipmi-fan-speed-control-gpu-system.23740/
+	// Zone 0 appears to be 0x10
+	var zone = "0x10"
+	ipmiArgs := fmt.Sprintf("%s raw 0x30 0x91 0x5A 0x3 %s 0x%x", ipmitool, zone, int(fanSpeed))
+	ipmitool := exec.Command(ipmitool)
+	ipmitool.Args = strings.Split(ipmiArgs, " ")
 	ipmitool.Run()
-	/*if err != nil {
-		fmt.Println(err.Error())
-		return
-	}
-	*/
 }
 
 // Set zone 1 (0x01) to full speed (0x01).
 func initializeFans() {
-	//ipmiArgs := strings.Split(fmt.Sprintf("raw 0x30 0x91 0x5a 0x03 0x10 0x01"), " ")
-	ipmiArgs := strings.Split(fmt.Sprintf("/usr/bin/ipmitool raw 0x30 0x45 0x01 0x01"), " ")
-	ipmitool := exec.Command("/usr/bin/ipmitool")
-	ipmitool.Args = ipmiArgs
+	// Cooling profiles in BMC
+	// Standard: 0
+	// Full: 1
+	// Optimal: 2
+	// Heavy IO: 4
+	// We set to Full profile because the BMC seems to stop managing the fans
+	// unless there is a thermal violation in this mode, allowing us to fully
+	//  control the fan profile
+	var profile = "0x01"
+	ipmiArgs := fmt.Sprintf("%s raw 0x30 0x45 0x01 %s", ipmitool, profile)
+	ipmitool := exec.Command(ipmitool)
+	ipmitool.Args = strings.Split(ipmiArgs, " ")
 	ipmitool.Run()
 }
 
+// Unused function - show what our current fan profile is
+func showCurrentFanProfile() {
+	ipmiArgs := fmt.Sprintf("%s raw 0x30 0x45 0x00", ipmitool)
+	ipmitool := exec.Command(ipmitool)
+	ipmitool.Args = strings.Split(ipmiArgs, " ")
+	ipmitool.Run()
+
+}
+
+// Unused function - reset the BMC to clear all the things
 func resetBmc() {
-	ipmiArgs := strings.Split(fmt.Sprintf("/usr/bin/ipmitool bmc reset cold"), " ")
-	ipmitool := exec.Command("/usr/bin/ipmitool")
+	ipmiArgs := strings.Split(fmt.Sprintf("%s bmc reset cold", ipmitool), " ")
+	ipmitool := exec.Command(ipmitool)
 	ipmitool.Args = ipmiArgs
 	ipmitool.Run()
 }
 
 func main() {
-	// Shouldn't be needed, but reset the BMC to clear all the things
-	//resetBmc()
-
 	initializeFans()
 	for true {
 		manageFans()
