@@ -37,6 +37,12 @@ jobs:
 stepTemplates:
 - name: Compile and Release
   steps:
+  - !CheckoutStep
+    name: Checkout
+    cloneCredential: !DefaultCredential {}
+    withLfs: false
+    withSubmodules: false
+    condition: ALL_PREVIOUS_STEPS_WERE_SUCCESSFUL
   - !CommandStep
     name: Compile
     runInContainer: true
