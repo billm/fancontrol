@@ -38,6 +38,8 @@ var fanLowTemp float64 = 30
 var fanHighSpeed float64 = 255
 var fanHighTemp float64 = 80
 
+var lastTemp float64
+
 // Figure out the number of CPU sockets
 func getSocketCount() int {
 	totSockets := 0
@@ -106,6 +108,12 @@ func getMaxPackageTemp(numSockets int) float64 {
 	return float64(maxTemp)
 }
 
+func runIpmiTool(args string) {
+	ipmitool := exec.Command(ipmitool)
+	ipmitool.Args = strings.Split(args, " ")
+	ipmitool.Run()
+}
+
 // Manage the fan speed
 // TODO refactor this to pull the socket code out, that logic doesn't belong in this function
 func manageFans() {
@@ -116,24 +124,26 @@ func manageFans() {
 	curTemp := getMaxPackageTemp(numSockets)
 	fmt.Printf("Current hottest CPU at %dC\n", int(curTemp))
 
-	if curTemp < fanLowTemp {
-		fanSpeed = fanLowSpeed
-	} else if curTemp > fanHighTemp {
-		fanSpeed = fanHighSpeed
-	} else {
-		var fanSpeedF float64 = ((curTemp - fanLowTemp) / (fanHighTemp - fanLowTemp)) * (fanHighSpeed)
-		fanSpeed = fanSpeedF
-	}
-	// TODO - cache fan speeds, only send ipmitool command if this needs to change
-	fmt.Printf("Setting fan speed to %d%%\n", int((fanSpeed/fanHighSpeed)*100))
+	// Only need to change the fan speed if the temperature has changed
+	if int(curTemp) != int(lastTemp) {
+		if curTemp < fanLowTemp {
+			fanSpeed = fanLowSpeed
+		} else if curTemp > fanHighTemp {
+			fanSpeed = fanHighSpeed
+		} else {
+			var fanSpeedF float64 = ((curTemp - fanLowTemp) / (fanHighTemp - fanLowTemp)) * (fanHighSpeed)
+			fanSpeed = fanSpeedF
+		}
+		fmt.Printf("Setting fan speed to %d%%\n", int((fanSpeed/fanHighSpeed)*100))
 
-	// https://forums.servethehome.com/index.php?threads/supermicro-ipmi-fan-speed-control-gpu-system.23740/
-	// Zone 0 appears to be 0x10
-	var zone = "0x10"
-	ipmiArgs := fmt.Sprintf("%s raw 0x30 0x91 0x5A 0x3 %s 0x%x", ipmitool, zone, int(fanSpeed))
-	ipmitool := exec.Command(ipmitool)
-	ipmitool.Args = strings.Split(ipmiArgs, " ")
-	ipmitool.Run()
+		// https://forums.servethehome.com/index.php?threads/supermicro-ipmi-fan-speed-control-gpu-system.23740/
+		// Zone 0 appears to be 0x10
+		var zone = "0x10"
+		ipmiArgs := fmt.Sprintf("%s raw 0x30 0x91 0x5A 0x3 %s 0x%x", ipmitool, zone, int(fanSpeed))
+		runIpmiTool(ipmiArgs)
+	}
+	// Cache our last temp
+	lastTemp = curTemp
 }
 
 // Set zone 1 (0x01) to full speed (0x01).
@@ -145,29 +155,22 @@ func initializeFans() {
 	// Heavy IO: 4
 	// We set to Full profile because the BMC seems to stop managing the fans
 	// unless there is a thermal violation in this mode, allowing us to fully
-	//  control the fan profile
+	// control the fan profile
 	var profile = "0x01"
 	ipmiArgs := fmt.Sprintf("%s raw 0x30 0x45 0x01 %s", ipmitool, profile)
-	ipmitool := exec.Command(ipmitool)
-	ipmitool.Args = strings.Split(ipmiArgs, " ")
-	ipmitool.Run()
+	runIpmiTool(ipmiArgs)
 }
 
 // Unused function - show what our current fan profile is
 func showCurrentFanProfile() {
 	ipmiArgs := fmt.Sprintf("%s raw 0x30 0x45 0x00", ipmitool)
-	ipmitool := exec.Command(ipmitool)
-	ipmitool.Args = strings.Split(ipmiArgs, " ")
-	ipmitool.Run()
-
+	runIpmiTool(ipmiArgs)
 }
 
 // Unused function - reset the BMC to clear all the things
 func resetBmc() {
-	ipmiArgs := strings.Split(fmt.Sprintf("%s bmc reset cold", ipmitool), " ")
-	ipmitool := exec.Command(ipmitool)
-	ipmitool.Args = ipmiArgs
-	ipmitool.Run()
+	ipmiArgs := fmt.Sprintf("%s bmc reset cold", ipmitool)
+	runIpmiTool(ipmiArgs)
 }
 
 func main() {
