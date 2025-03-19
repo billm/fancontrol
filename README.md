@@ -9,6 +9,7 @@ TODO
 - Probably should capture the output of ipmitool (if any) for logging if it has an error
 - ipmitool.sh can probabl go now, was a useful debugging tool that is no longer needed
 
+```
 Current console output
 Found 2 CPU packages
 Current hottest CPU at 52C
@@ -21,3 +22,4 @@ Setting fan speed to 40%
 Found 2 CPU packages
 Current hottest CPU at 50C
 Found 2 CPU packages
+```
